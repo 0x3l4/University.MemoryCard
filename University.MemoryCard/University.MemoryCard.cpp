@@ -16,8 +16,7 @@ HINSTANCE hInst;                                // текущий экземпл
 WCHAR szTitle[MAX_LOADSTRING];                  // Текст строки заголовка
 WCHAR szWindowClass[MAX_LOADSTRING];            // имя класса главного окна
 
-HWND hListView, hListBox, hEditMin, hEditMax, hButtonFilter;
-HWND hMemoryCountText;  // Поле с количеством регионов
+HWND hListView, hListBox, hEditMin, hEditMax, hStatusBar;
 DWORD selectedProcessID = 0;
 
 // Отправить объявления функций, включенных в этот модуль кода:
@@ -85,8 +84,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	WNDCLASSEXW wcex;
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
-
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
+
 	wcex.lpfnWndProc = WndProc;
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
@@ -97,6 +96,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_UNIVERSITYMEMORYCARD);
 	wcex.lpszClassName = szWindowClass;
 	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+
 
 	return RegisterClassExW(&wcex);
 }
@@ -116,7 +116,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hInst = hInstance; // Сохранить маркер экземпляра в глобальной переменной
 
 	HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+		CW_USEDEFAULT, 0, 800, 800, nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd)
 	{
@@ -146,37 +146,36 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 		InitCommonControls();
 		hListBox = CreateWindow(WC_LISTBOX, L"", WS_VSCROLL | WS_CHILD | WS_VISIBLE | LBS_NOTIFY | WS_BORDER,
-			10, 10, 200, 200, hWnd, (HMENU)2, hInst, NULL);
+			10, 10, 380, 200, hWnd, (HMENU)2, hInst, NULL);
 
 		hListView = CreateWindow(WC_LISTVIEW, L"", WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL,
-			220, 10, 860, 400, hWnd, (HMENU)1, hInst, NULL);
+			10, 220, 860, 500, hWnd, (HMENU)1, hInst, NULL);
+
+		hStatusBar = CreateWindow(STATUSCLASSNAME, NULL, WS_CHILD | WS_VISIBLE,
+			0, 0, 0, 0, hWnd, (HMENU)6, hInst, NULL);
 
 		SendMessage(hListView, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, LVS_EX_GRIDLINES);
 
-		CreateWindowW(L"STATIC", L"Регионов памяти:", WS_CHILD | WS_VISIBLE,
-			220, 420, 150, 20, hWnd, NULL, hInst, NULL);
-
-		hMemoryCountText = CreateWindowW(L"STATIC", L"0", WS_CHILD | WS_VISIBLE,
-			360, 420, 100, 20, hWnd, NULL, hInst, NULL);
-
 		CreateWindowW(L"STATIC", L"Минимальный адрес", WS_CHILD | WS_VISIBLE,
-			10, 230, 150, 20, hWnd, NULL, hInst, NULL);
+			420, 160, 150, 20, hWnd, NULL, hInst, NULL);
 
 		hEditMin = CreateWindow(WC_EDIT, L"0", WS_CHILD | WS_VISIBLE | WS_BORDER,
-			10, 250, 150, 20, hWnd, (HMENU)3, hInst, NULL);
+			420, 183, 150, 20, hWnd, (HMENU)3, hInst, NULL);
 
 		CreateWindowW(L"STATIC", L"Максимальный адрес", WS_CHILD | WS_VISIBLE,
-			10, 280, 150, 20, hWnd, NULL, hInst, NULL);
+			600, 160, 150, 20, hWnd, NULL, hInst, NULL);
 
 		hEditMax = CreateWindow(WC_EDIT, L"FFFFFFFFFFFFFFF", WS_CHILD | WS_VISIBLE | WS_BORDER,
-			10, 300, 150, 20, hWnd, (HMENU)4, hInst, NULL);
-
-		hButtonFilter = CreateWindow(WC_BUTTON, L"Filter", WS_CHILD | WS_VISIBLE,
-			10, 330, 80, 20, hWnd, (HMENU)5, hInst, NULL);
+			600, 183, 150, 20, hWnd, (HMENU)4, hInst, NULL);
 
 		AddListViewColumns(hListView);
 		PopulateProcessList(hListBox);
 		break;
+
+	case WM_SIZE:
+		SendMessage(hStatusBar, WM_SIZE, 0, 0);
+		break;
+
 	case WM_COMMAND:
 	{
 		int wmId = LOWORD(wParam);
@@ -339,9 +338,10 @@ void PrintMemoryInfo(HWND hWndListView, DWORD processID, LPVOID minAddress, LPVO
 
 	CloseHandle(hProcess);
 
+	// Обновление статус-бара количеством регионов памяти
 	wchar_t countBuffer[50];
-	swprintf_s(countBuffer, L"%d", index);
-	SetWindowText(hMemoryCountText, countBuffer);
+	swprintf_s(countBuffer, L"Регионов памяти: %d", index);
+	SendMessage(hStatusBar, SB_SETTEXT, 0, (LPARAM)countBuffer);
 }
 
 void PopulateProcessList(HWND hWndListBox) {

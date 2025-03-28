@@ -27,13 +27,14 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 void AddListViewColumns(HWND hWndListView);
-void AddListViewItem(HWND hWndListView, int index, MEMORY_BASIC_INFORMATION mbi);
+void AddListViewItem(HWND hWndListView, int index, MEMORY_BASIC_INFORMATION mbi, SIZE_T pagesCount);
 void PrintMemoryInfo(HWND hWndListView, DWORD processID, LPVOID minAddress, LPVOID maxAddress);
 const wchar_t* GetProtectString(DWORD protect);
 const wchar_t* GetTypeString(DWORD type);
 const wchar_t* GetStateString(DWORD state);
 
 void PopulateProcessList(HWND hWndComboBox);
+
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
@@ -171,7 +172,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		hEditMax = CreateWindow(WC_EDIT, L"FFFFFFFFFFFFFFF", WS_CHILD | WS_VISIBLE | WS_BORDER,
 			10, 300, 150, 20, hWnd, (HMENU)4, hInst, NULL);
 
-		hButtonFilter = CreateWindow(WC_BUTTON, L"Filter", WS_CHILD | WS_VISIBLE,
+		hButtonFilter = CreateWindow(WC_BUTTON, L"Фильтр", WS_CHILD | WS_VISIBLE,
 			10, 330, 80, 20, hWnd, (HMENU)5, hInst, NULL);
 
 		AddListViewColumns(hListView);
@@ -291,9 +292,13 @@ void AddListViewColumns(HWND hWndListView) {
 	lvc.pszText = (LPWSTR)L"State";
 	lvc.cx = 100;
 	ListView_InsertColumn(hWndListView, 7, &lvc);
+
+	lvc.pszText = (LPWSTR)L"Pages";
+	lvc.cx = 100;
+	ListView_InsertColumn(hWndListView, 8, &lvc);
 }
 
-void AddListViewItem(HWND hWndListView, int index, MEMORY_BASIC_INFORMATION mbi) {
+void AddListViewItem(HWND hWndListView, int index, MEMORY_BASIC_INFORMATION mbi, SIZE_T pagesCount) {
 	wchar_t buffer[256];
 	LVITEM lvi;
 	lvi.mask = LVIF_TEXT;
@@ -321,6 +326,9 @@ void AddListViewItem(HWND hWndListView, int index, MEMORY_BASIC_INFORMATION mbi)
 
 	swprintf_s(buffer, L"%s", GetStateString(mbi.State));
 	ListView_SetItemText(hWndListView, index, 6, buffer);
+
+	swprintf_s(buffer, L"%llu", (unsigned long long)pagesCount);
+	ListView_SetItemText(hWndListView, index, 7, buffer);
 }
 
 void PrintMemoryInfo(HWND hWndListView, DWORD processID, LPVOID minAddress, LPVOID maxAddress) {
@@ -332,11 +340,15 @@ void PrintMemoryInfo(HWND hWndListView, DWORD processID, LPVOID minAddress, LPVO
 	LPVOID address = minAddress;
 	int index = 0;
 
+	SYSTEM_INFO sysInfo;
+	GetSystemInfo(&sysInfo);
+	SIZE_T pageSize = sysInfo.dwPageSize; // Размер страницы памяти
+
 	while (address < maxAddress && VirtualQueryEx(hProcess, address, &mbi, sizeof(mbi)) == sizeof(mbi)) {
-		AddListViewItem(hWndListView, index++, mbi);
+		SIZE_T pagesCount = mbi.RegionSize / pageSize;
+		AddListViewItem(hWndListView, index++, mbi, pagesCount);
 		address = (LPVOID)((DWORD_PTR)address + mbi.RegionSize);
 	}
-
 	CloseHandle(hProcess);
 
 	wchar_t countBuffer[50];

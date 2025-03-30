@@ -35,6 +35,52 @@ const wchar_t* GetStateString(DWORD state);
 
 void PopulateProcessList(HWND hWndComboBox);
 
+LRESULT ListViewCustomDraw(LPNMLVCUSTOMDRAW lplvcd)
+{
+	switch (lplvcd->nmcd.dwDrawStage)
+	{
+	case CDDS_PREPAINT:
+		return CDRF_NOTIFYITEMDRAW; // Просим уведомлять при отрисовке элементов
+
+	case CDDS_ITEMPREPAINT:
+		return CDRF_NOTIFYSUBITEMDRAW; // Просим уведомлять при отрисовке подэлементов
+
+	case CDDS_SUBITEM | CDDS_ITEMPREPAINT:
+	{
+		int iItem = static_cast<int>(lplvcd->nmcd.dwItemSpec);
+		int iSubItem = lplvcd->iSubItem;
+
+		wchar_t baseAddr[20], allocBase[20];
+
+		// Получаем значения BaseAddress (0-й столбец) и AllocationBase (4-й столбец)
+		ListView_GetItemText(hListView, iItem, 0, baseAddr, sizeof(baseAddr) / sizeof(wchar_t));
+		ListView_GetItemText(hListView, iItem, 4, allocBase, sizeof(allocBase) / sizeof(wchar_t));
+
+		// Если BaseAddress == AllocationBase и текущий подэлемент - нужный столбец
+		if (wcscmp(baseAddr, allocBase) == 0 && (iSubItem == 0 || iSubItem == 4))
+		{
+			lplvcd->clrTextBk = RGB(50, 255, 50); // Желтый фон
+			lplvcd->clrText = RGB(0, 0, 0);       // Черный текст
+		}
+		else if ((iSubItem == 0 || iSubItem == 4))
+		{
+			lplvcd->clrTextBk = RGB(255, 255, 0); // Зелёный фон
+			lplvcd->clrText = RGB(0, 0, 0);       // Черный текст
+		}
+		else
+		{
+			lplvcd->clrTextBk = RGB(255, 255, 255); // Желтый фон
+			lplvcd->clrText = RGB(0, 0, 0);       // Черный текст
+		}
+
+		return CDRF_DODEFAULT;
+	}
+	}
+
+	return CDRF_DODEFAULT;
+}
+
+
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
@@ -223,6 +269,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 
 	}
+	case WM_NOTIFY:
+	{
+		LPNMHDR pnmh = (LPNMHDR)lParam;
+		if (pnmh->hwndFrom == hListView && pnmh->code == NM_CUSTOMDRAW)
+		{
+			return ListViewCustomDraw((LPNMLVCUSTOMDRAW)lParam);
+		}
+	}
+	break;
 	break;
 	case WM_PAINT:
 	{
@@ -315,7 +370,7 @@ void AddListViewItem(HWND hWndListView, int index, MEMORY_BASIC_INFORMATION mbi,
 	swprintf_s(buffer, L"%s", GetTypeString(mbi.Type));
 	ListView_SetItemText(hWndListView, index, 2, buffer);
 
-	swprintf_s(buffer, L"%lu", mbi.Protect);
+	swprintf_s(buffer, L"%s", GetProtectString(mbi.Protect));
 	ListView_SetItemText(hWndListView, index, 3, buffer);
 
 	swprintf_s(buffer, L"%p", mbi.AllocationBase);
